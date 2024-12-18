@@ -15,20 +15,24 @@ struct AssistantMessageView: View {
     @Default(.fontSize) private var fontSize
 
     private let content: String
+    private let identifier: UUID
     private let isGenerating: Bool
     private let isLastMessage: Bool
     private let copyAction: (_ content: String) -> Void
     private let regenerateAction: () -> Void
-
+    private let regenerateAtAction: (_ identifier: UUID) -> Void
+    
     @Environment(CodeHighlighter.self) private var codeHighlighter
     @AppStorage("experimentalCodeHighlighting") private var experimentalCodeHighlighting = false
 
-    init(content: String, isGenerating: Bool, isLastMessage: Bool, copyAction: @escaping (_ content: String) -> Void, regenerateAction: @escaping () -> Void) {
+    init(content: String, isGenerating: Bool, isLastMessage: Bool, identifier: UUID, copyAction: @escaping (_ content: String) -> Void, regenerateAction: @escaping () -> Void, regenerateAtAction: @escaping (_ identifier: UUID) -> Void) {
         self.content = content
+        self.identifier = identifier
         self.isGenerating = isGenerating
         self.isLastMessage = isLastMessage
         self.copyAction = copyAction
         self.regenerateAction = regenerateAction
+        self.regenerateAtAction = regenerateAtAction
     }
     
     var body: some View {
@@ -60,6 +64,8 @@ struct AssistantMessageView: View {
                     MessageButton("Regenerate", systemImage: "arrow.triangle.2.circlepath", action: regenerateAction)
                         .keyboardShortcut("r", modifiers: [.command])
                         .visible(if: isLastMessage, removeCompletely: true)
+                    MessageButton("Regenerate", systemImage: "arrow.triangle.2.circlepath", action: { regenerateAtAction(identifier) })
+                        .visible(if: !isLastMessage, removeCompletely: true)
                 }
                 .hide(if: isLastMessage && isGenerating)
             }

@@ -17,8 +17,8 @@ final class MessageViewModel {
     
     var messages: [Message] = []
     var tempResponse: String = ""
-    var loading: MessageViewModelLoading? = nil
-    var error: MessageViewModelError? = nil
+    var loading: MessageViewModelLoading?
+    var error: MessageViewModelError?
     
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
@@ -42,16 +42,22 @@ final class MessageViewModel {
         }
     }
     
+    func generateAt(index: Int){
+        let range = index..<self.messages.count
+        removeInRange(range: range)
+    }
+    
+    
     func generate(_ ollamaKit: OllamaKit, activeChat: Chat, prompt: String) {
         let message = Message(prompt: prompt)
         message.chat = activeChat
-        messages.append(message)
-        modelContext.insert(message)
+        self.messages.append(message)
+        self.modelContext.insert(message)
         
         self.loading = .generate
         self.error = nil
         
-        generationTask = Task {
+        self.generationTask = Task {
             defer { self.loading = nil }
             
             do {
@@ -60,14 +66,14 @@ final class MessageViewModel {
                 for try await chunk in ollamaKit.chat(data: data) {
                     if Task.isCancelled { break }
                     
-                    tempResponse = tempResponse + (chunk.message?.content ?? "")
+                    self.tempResponse = self.tempResponse + (chunk.message?.content ?? "")
                     
                     if chunk.done {
-                        message.response = tempResponse
+                        message.response = self.tempResponse
                         activeChat.modifiedAt = .now
-                        tempResponse = ""
+                        self.tempResponse = ""
                         
-                        if messages.count == 1 {
+                        if self.messages.count == 1 {
                             self.generateTitle(ollamaKit, activeChat: activeChat)
                         }
                     }
@@ -101,6 +107,20 @@ final class MessageViewModel {
         }
     }
     
+    func regenerateAt(_ ollamaKit: OllamaKit, activeChat: Chat, index: Int){
+        let range = index+1..<self.messages.count
+        removeInRange(range: range)
+        regenerate(ollamaKit, activeChat: activeChat)
+    }
+    
+    func removeInRange(range : Range<Int>){
+        for index in range {
+            let message = self.messages[index]
+            modelContext.delete(message)
+        }
+        self.messages.removeLast(range.count)
+    }
+    
     func regenerate(_ ollamaKit: OllamaKit, activeChat: Chat) {
         guard let lastMessage = messages.last else { return }
         lastMessage.response = nil
@@ -108,21 +128,20 @@ final class MessageViewModel {
         self.loading = .generate
         self.error = nil
         
-        generationTask = Task {
+        self.generationTask = Task {
             defer { self.loading = nil }
-            
             do {
                 let data = lastMessage.toOKChatRequestData(messages: self.messages)
                 
                 for try await chunk in ollamaKit.chat(data: data) {
                     if Task.isCancelled { break }
                     
-                    tempResponse = tempResponse + (chunk.message?.content ?? "")
+                    self.tempResponse = self.tempResponse + (chunk.message?.content ?? "")
                     
                     if chunk.done {
-                        lastMessage.response = tempResponse
+                        lastMessage.response = self.tempResponse
                         activeChat.modifiedAt = .now
-                        tempResponse = ""
+                        self.tempResponse = ""
                     }
                 }
 
@@ -157,7 +176,7 @@ final class MessageViewModel {
     private func generateTitle(_ ollamaKit: OllamaKit, activeChat: Chat) {
         var requestMessages = [OKChatRequestData.Message]()
         
-        for message in messages {
+        for message in self.messages {
             let userMessage = OKChatRequestData.Message(role: .user, content: message.prompt)
             let assistantMessage = OKChatRequestData.Message(role: .assistant, content: message.response ?? "")
             
@@ -168,7 +187,7 @@ final class MessageViewModel {
         let userMessage = OKChatRequestData.Message(role: .user, content: "Just reply with a short title about this conversation. One line maximum. No markdown.")
         requestMessages.append(userMessage)
         
-        generationTask = Task {
+        self.generationTask = Task {
             defer { self.loading = nil }
             
             activeChat.name = "New Chat"
