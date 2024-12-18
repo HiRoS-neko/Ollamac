@@ -5,8 +5,8 @@
 //  Created by Kevin Hermawan on 8/2/24.
 //
 
-import Defaults
 import ChatField
+import Defaults
 import OllamaKit
 import SwiftUI
 import ViewCondition
@@ -33,7 +33,9 @@ struct ChatView: View {
                     
                     UserMessageView(
                         content: message.prompt,
-                        copyAction: self.copyAction
+                        identifier: message.id,
+                        copyAction: self.copyAction,
+                        generateAtAction: self.generateAtAction
                     )
                     .padding(.top)
                     .padding(.horizontal)
@@ -43,8 +45,10 @@ struct ChatView: View {
                         content: message.response ?? messageViewModel.tempResponse,
                         isGenerating: messageViewModel.loading == .generate,
                         isLastMessage: lastMessageId == message.id,
+                        identifier: message.id,
                         copyAction: self.copyAction,
-                        regenerateAction: self.regenerateAction
+                        regenerateAction: self.regenerateAction,
+                        regenerateAtAction: self.regenerateAtAction
                     )
                     .id(message)
                     .padding(.top)
@@ -85,7 +89,6 @@ struct ChatView: View {
                         }
                     }
                     .chatFieldStyle(.capsule)
-                    .font(Font.system(size: 16))
                 }
                 .padding(.top, 8)
                 .padding(.bottom, 12)
@@ -120,11 +123,11 @@ struct ChatView: View {
     }
     
     private func onActiveChatChanged() {
-        self.prompt = ""
+        prompt = ""
         
         if let activeChat = chatViewModel.activeChat, let host = activeChat.host, let baseURL = URL(string: host) {
-            self.ollamaKit = OllamaKit(baseURL: baseURL)
-            self.chatViewModel.fetchModels(self.ollamaKit)
+            ollamaKit = OllamaKit(baseURL: baseURL)
+            chatViewModel.fetchModels(ollamaKit)
         }
     }
     
@@ -147,6 +150,22 @@ struct ChatView: View {
         prompt = ""
     }
     
+    private func generateAtAction(_ identifier: UUID) {
+        guard let activeChat = chatViewModel.activeChat, !activeChat.model.isEmpty, chatViewModel.isHostReachable else { return }
+        
+        if messageViewModel.loading == .generate {
+            messageViewModel.cancelGeneration()
+        } else {
+            guard chatViewModel.activeChat != nil else { return }
+            
+            if let i = messageViewModel.messages.firstIndex(where: { $0.id == identifier }) {
+                let prompt = messageViewModel.messages[i].prompt
+                messageViewModel.generateAt(index: i)
+                self.prompt = prompt
+            }
+        }
+    }
+    
     private func regenerateAction() {
         guard let activeChat = chatViewModel.activeChat, !activeChat.model.isEmpty, chatViewModel.isHostReachable else { return }
         
@@ -156,6 +175,22 @@ struct ChatView: View {
             guard let activeChat = chatViewModel.activeChat else { return }
             
             messageViewModel.regenerate(ollamaKit, activeChat: activeChat)
+        }
+        
+        prompt = ""
+    }
+
+    private func regenerateAtAction(_ identifier: UUID) {
+        guard let activeChat = chatViewModel.activeChat, !activeChat.model.isEmpty, chatViewModel.isHostReachable else { return }
+        
+        if messageViewModel.loading == .generate {
+            messageViewModel.cancelGeneration()
+        } else {
+            guard let activeChat = chatViewModel.activeChat else { return }
+            
+            if let i = messageViewModel.messages.firstIndex(where: { $0.id == identifier }) {
+                messageViewModel.regenerateAt(ollamaKit, activeChat: activeChat, index: i)
+            }
         }
         
         prompt = ""
