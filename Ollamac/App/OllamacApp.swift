@@ -7,14 +7,11 @@
 
 import Defaults
 import AppInfo
-import Sparkle
 import SwiftUI
 import SwiftData
 
 @main
 struct OllamacApp: App {
-    @State private var appUpdater: AppUpdater
-    private var updater: SPUUpdater
     
     @State private var chatViewModel: ChatViewModel
     @State private var messageViewModel: MessageViewModel
@@ -33,12 +30,6 @@ struct OllamacApp: App {
     
     init() {
         let modelContext = sharedModelContainer.mainContext
-        
-        let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
-        self.updater = updaterController.updater
-        
-        let appUpdater = AppUpdater(updater)
-        self._appUpdater = State(initialValue: appUpdater)
         
         let chatViewModel = ChatViewModel(modelContext: modelContext)
         self._chatViewModel = State(initialValue: chatViewModel)
@@ -71,13 +62,6 @@ struct OllamacApp: App {
                 if chatViewModel.selectedChats.count > 0 {
                     SidebarContextMenu(chatViewModel: chatViewModel)
                 }
-            }
-            
-            CommandGroup(after: .appInfo) {
-                Button("Check for Updates...") {
-                    updater.checkForUpdates()
-                }
-                .disabled(appUpdater.canCheckForUpdates == false)
             }
             
             CommandGroup(replacing: .help) {
